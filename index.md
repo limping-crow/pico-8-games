@@ -7,3 +7,4 @@ A collection of games for [Pico-8 fantasy console](https://www.lexaloffle.com/pi
 
 
 ## WIP games
+1. [Ping-pong](./pingpong/pingpong.html)
