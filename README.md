@@ -3,4 +3,4 @@
 
 A collection of games for [Pico-8 fantasy console](https://www.lexaloffle.com/pico-8.php), split by folders.
 
-List of games
+Games accessible via [GitHub Pages](https://nothisim.github.io/pico-8-games/)
