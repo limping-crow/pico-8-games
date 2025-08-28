@@ -67,7 +67,7 @@ function create_ball()
 
     ball.velocity_x = 1 * random_direction()
     ball.velocity_y = (0.4 + rnd(0.9)) * random_direction()
-    ball.acceleration = 1  --1.001
+    ball.acceleration = 1.001
     return ball
 end
 
@@ -78,8 +78,6 @@ end
 
 function draw_ball(ball)
     circfill(ball.x, ball.y, ball.radius, ball.color)
-    -- print(ball.x, 50, 3,1)
-    -- print(ball.y, 70, 3,1)
 end
 
 function move_player(player)
@@ -115,17 +113,18 @@ function move_ball(ball)
 
     ball.velocity_x = ball.velocity_x * ball.acceleration
     if (ball.velocity_x > 0) then
-        ball.x += ceil(ball.velocity_x)
+        ball.x += ball.velocity_x
     else
-        ball.x += flr(ball.velocity_x)
+        ball.x += ball.velocity_x
     end
 
     ball.velocity_y = ball.velocity_y * ball.acceleration
-    ball.y += flr(ball.velocity_y)
+    ball.y += ball.velocity_y
 end
 
 function detect_collisions(ball)
-    local multipliers = {x=1, y=1} -- TODO change to directions (use abs to set direction correctly)
+    -- idea: replace multipliers with directions (use abs to set direction correctly)
+    local multipliers = {x=1, y=1} 
 
     -- here goes nothing
     detect_collision_with_pad(ball, player_l, multipliers)
