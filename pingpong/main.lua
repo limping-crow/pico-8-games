@@ -1,13 +1,35 @@
 function _init()
+    -- consts, enums etc
+    modes = {SINGLE=1, DOUBLE=2}
+    bools = {true,false}
+
+    -- states
+    mode = modes.SINGLE
+    is_started = false
+    is_mode_chosen = false
+
+    -- actors/objects
     player_l = create_player(true)
     player_r = create_player(false)
     ball = create_ball()
-    is_started = false
-    bools = {true,false}
 end
 
 function _update()
-    if (btn(5) and not is_started) then
+    -- players must choose mode first
+    if (not is_mode_chosen) then
+        if (btnp(2) or btnp(3)) then
+            if (mode == modes.SINGLE) then 
+                mode = modes.DOUBLE 
+            else
+                mode = modes.SINGLE
+            end
+        elseif (btnp(5)) then
+            is_mode_chosen = true
+        end
+        return
+
+    -- in game, let players start new sets
+    elseif (btnp(5) and not is_started) then
         is_started = true
         ball = create_ball()
     end
@@ -23,9 +45,13 @@ end
 
 function _draw()
     cls(5)
-    draw_player(player_l)
-    draw_player(player_r)
-    draw_ball(ball)
+    if (not is_mode_chosen) then
+        draw_mode_menu()
+    else
+        draw_player(player_l)
+        draw_player(player_r)
+        draw_ball(ball)
+    end
 end
 
 function create_player(is_left)
@@ -78,6 +104,26 @@ end
 
 function draw_ball(ball)
     circfill(ball.x, ball.y, ball.radius, ball.color)
+end
+
+function draw_mode_menu()
+    -- maybe add more state to modes???
+    local highlight_clr = 0
+    local background_clr = 13
+    rectfill(31, 31, 96, 96, background_clr)
+    print("choose mode\nand press X", 42, 32, highlight_clr)
+    if (mode == modes.SINGLE) then
+        s_clr = background_clr
+        d_clr = highlight_clr
+        selector_y = 59
+    else
+        s_clr = highlight_clr
+        d_clr = background_clr
+        selector_y = 69
+    end
+    rectfill(47, selector_y, 80, selector_y + 7, highlight_clr)
+    print("single", 53, 60, s_clr)
+    print("double", 53, 70, d_clr)
 end
 
 function move_player(player)
