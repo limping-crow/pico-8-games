@@ -61,12 +61,14 @@ function create_player(is_left)
         player.x = 2
         player.width = -2
         player.code = 1
-        player.score_x = 32
+        player.score_x = 15
+        player.score_y = 12
     else
         player.x = 125
         player.width = 2
         player.code = 0
-        player.score_x = 96
+        player.score_x = 111
+        player.score_y = 111
     end
 
     --measurements
@@ -99,7 +101,7 @@ end
 
 function draw_player(player)
     rectfill(player.x, player.y, player.x + player.width, player.y + player.height, player.color)
-    print(player.score, player.score_x, 3, 0)
+    print(player.score, player.score_x, player.score_y, 0)
 end
 
 function draw_ball(ball)
