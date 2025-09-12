@@ -1,7 +1,13 @@
 function _init()
     -- consts, enums etc
-    modes = {SINGLE=1, DOUBLE=2}
     bools = {true,false}
+    modes = {SINGLE=1, DOUBLE=2}
+    pad_types = {horizontal="horizontal", vertical="vertical"}
+    pads_per_mode = {}
+    pads_per_mode[modes.SINGLE] = {pad_types.vertical}
+    pads_per_mode[modes.DOUBLE] = {pad_types.vertical, pad_types.horizontal}
+    coords = {"x", "y"}
+    player_codes = {0, 1}
 
     -- states
     mode = modes.SINGLE
@@ -9,9 +15,8 @@ function _init()
     is_mode_chosen = false
 
     -- actors/objects
-    player_l = create_player(true)
-    player_r = create_player(false)
-    ball = create_ball()
+    players = nil
+    ball = nil
 end
 
 function _update()
@@ -25,6 +30,8 @@ function _update()
             end
         elseif (btnp(5)) then
             is_mode_chosen = true
+            players = create_players(mode)
+            ball = create_ball()
         end
         return
 
@@ -34,8 +41,7 @@ function _update()
         ball = create_ball()
     end
 
-    move_player(player_l)
-    move_player(player_r)
+    move_players(players)
 
     if (is_started) then 
         detect_collisions(ball)
@@ -48,42 +54,68 @@ function _draw()
     if (not is_mode_chosen) then
         draw_mode_menu()
     else
-        draw_player(player_l)
-        draw_player(player_r)
+        draw_players(players)
         draw_ball(ball)
     end
 end
 
-function create_player(is_left)
-    local player = {}
-    player.is_left = is_left
-    if (is_left) then
-        player.x = 2
-        player.width = -2
-        player.code = 1
-        player.score_x = 15
-        player.score_y = 12
-    else
-        player.x = 125
-        player.width = 2
-        player.code = 0
-        player.score_x = 111
-        player.score_y = 111
+function create_players(mode)
+    local players = {}
+    for code in all(player_codes) do
+        local player = {}
+        player.code = code
+        player.score = 0
+        player.pads = {}
+
+        -- one player centered around 0,0, another - 127,127
+        -- it's convoluted, I know
+        player.along_side = abs(code - 1) * 127
+        
+        -- I have no idea what I'm doing
+        player.score_x = abs(player.along_side - 16)
+        player.score_y = abs(player.along_side -  16)
+
+        players[code] = player
+        
+        -- add pads 
+        for p_type in all(pads_per_mode[mode]) do 
+            if (p_type == pad_types.horizontal) then
+                dynamic_coord = "x"
+            else
+                dynamic_coord = "y"
+            end
+            player.pads[p_type] = create_pad(dynamic_coord, player.along_side)
+        end
     end
 
-    --measurements
-    player.y = 50
-    player.height = 24
+    return players
+end
 
-    --properties
-    player.color = 1
-    player.score = 0
+function create_pad(dynamic_coord, along_side)
+    local pad = {}
+
+    pad.color = 1
+    pad.thickness = 2
+    pad.length = 24
+    pad.dynamic_coord = dynamic_coord
+    pad.along_side = along_side
+
+    for coord in all(coords) do
+        if (coord == dynamic_coord) then
+            -- place the pad in the middle of screen side
+            pad[coord] = 50  
+        else
+            -- set static coordinate once and for all
+            pad[coord] = abs(along_side - pad.thickness)
+        end
+    end
 
     --movement
-    player.base_velocity = 1
-    player.velocity = 0
-    player.acceleration = 1.1
-    return player
+    pad.base_velocity = 1
+    pad.velocity = 0
+    pad.acceleration = 1.1
+
+    return pad
 end
 
 function create_ball()
@@ -99,9 +131,21 @@ function create_ball()
     return ball
 end
 
-function draw_player(player)
-    rectfill(player.x, player.y, player.x + player.width, player.y + player.height, player.color)
-    print(player.score, player.score_x, player.score_y, 0)
+function draw_players(players)
+    for _, player in pairs(players) do
+        for _, pad in pairs(player.pads) do
+            -- lame and crud, but works
+            if (pad.dynamic_coord == "x") do
+                end_x = pad.x + pad.length
+                end_y = pad.along_side
+            else
+                end_y = pad.y + pad.length
+                end_x = pad.along_side
+            end
+            rectfill(pad.x, pad.y, end_x, end_y, pad.color)
+            print(player.score, player.score_x, player.score_y, 0)
+        end
+    end
 end
 
 function draw_ball(ball)
@@ -128,32 +172,44 @@ function draw_mode_menu()
     print("double", 53, 70, d_clr)
 end
 
-function move_player(player)
-    if (btn(2, player.code)) then
-        -- up button
-        if (player.velocity >= 0) then 
-            --change of direction, slow down
-            player.velocity = -player.base_velocity
-        else
-            player.velocity = player.velocity * player.acceleration
-        end
-    elseif (btn(3, player.code)) then
-        -- down button
-        if (player.velocity <= 0) then 
-            --change of direction, slow down
-            player.velocity = player.base_velocity
-        else
-            player.velocity = player.velocity * player.acceleration
-        end
-    else
-        -- reset movement, no slow down for now
-        player.velocity = 0  --player.velocity / 1.3
-    end 
-    player.y = player.y + player.velocity
+function move_players(players)
+    for _, player in pairs(players) do
+        for p_type, pad in pairs(player.pads) do
+            if (p_type == pad_types.vertical) then
+                to_0_btn = 2
+                to_127_btn = 3
+            else
+                to_0_btn = 0
+                to_127_btn = 1
+            end
 
-    -- don't let the player out of screen boundaries
-    player.y = max(0, player.y)
-    player.y = min(127 - player.height, player.y)
+            if (btn(to_0_btn, player.code)) then
+                -- up or left button
+                if (pad.velocity >= 0) then 
+                    --change of direction, slow down
+                    pad.velocity = -pad.base_velocity
+                else
+                    pad.velocity = pad.velocity * pad.acceleration
+                end
+            elseif (btn(to_127_btn, player.code)) then
+                -- down or right button
+                if (pad.velocity <= 0) then 
+                    --change of direction, slow down
+                    pad.velocity = pad.base_velocity
+                else
+                    pad.velocity = pad.velocity * pad.acceleration
+                end
+            else
+                -- reset movement, no slow down for now
+                pad.velocity = 0  --player.velocity / 1.3
+            end 
+            pad[pad.dynamic_coord] += pad.velocity
+
+            -- don't let the pad out of screen boundaries
+            pad[pad.dynamic_coord] = max(0, pad[pad.dynamic_coord])
+            pad[pad.dynamic_coord] = min(127 - pad.length, pad[pad.dynamic_coord])
+        end
+    end
 end
 
 function move_ball(ball)
