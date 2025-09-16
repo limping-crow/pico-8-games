@@ -1,12 +1,12 @@
 function _init()
     -- consts, enums etc
-    bools = {true,false}
+    bools = {true, false}
     modes = {SINGLE=1, DOUBLE=2}
     pad_types = {horizontal="horizontal", vertical="vertical"}
     pads_per_mode = {}
     pads_per_mode[modes.SINGLE] = {pad_types.vertical}
     pads_per_mode[modes.DOUBLE] = {pad_types.vertical, pad_types.horizontal}
-    coords = {"x", "y"}
+    coords = {x="x", y="y"}
     player_codes = {0, 1}
 
     -- states
@@ -44,7 +44,7 @@ function _update()
     move_players(players)
 
     if (is_started) then 
-        detect_collisions(ball)
+        detect_collisions(ball, players, mode)
         move_ball(ball)
     end
 end
@@ -61,6 +61,7 @@ end
 
 function create_players(mode)
     local players = {}
+
     for code in all(player_codes) do
         local player = {}
         player.code = code
@@ -80,9 +81,9 @@ function create_players(mode)
         -- add pads 
         for p_type in all(pads_per_mode[mode]) do 
             if (p_type == pad_types.horizontal) then
-                dynamic_coord = "x"
+                dynamic_coord = coords.x
             else
-                dynamic_coord = "y"
+                dynamic_coord = coords.y
             end
             player.pads[p_type] = create_pad(dynamic_coord, player.along_side)
         end
@@ -100,13 +101,14 @@ function create_pad(dynamic_coord, along_side)
     pad.dynamic_coord = dynamic_coord
     pad.along_side = along_side
 
-    for coord in all(coords) do
+    for _, coord in pairs(coords) do
         if (coord == dynamic_coord) then
             -- place the pad in the middle of screen side
             pad[coord] = 50  
         else
             -- set static coordinate once and for all
             pad[coord] = abs(along_side - pad.thickness)
+            pad.static_coord = coord
         end
     end
 
@@ -226,24 +228,30 @@ function move_ball(ball)
     ball.y += ball.velocity_y
 end
 
-function detect_collisions(ball)
+function detect_collisions(ball, players, mode)
     -- idea: replace multipliers with directions (use abs to set direction correctly)
     local multipliers = {x=1, y=1} 
 
     -- here goes nothing
-    detect_collision_with_pad(ball, player_l, multipliers)
-    detect_collision_with_pad(ball, player_r, multipliers)
+    for _, player in pairs(players) do
+        for _, pad in pairs(player.pads) do
+            detect_collision_with_pad(ball, pad, multipliers)
+        end
+    end
 
-    detect_collision_with_walls(ball, multipliers)
-    detect_out_of_field(ball, multipliers)
+    if (mode == modes.SINGLE) then
+        detect_collision_with_walls(ball, multipliers)
+    end
 
-    if (multipliers.x == 0 or multipliers.y == 0) then 
-        -- ball out of field
+    local out = detect_out_of_field(ball, mode)
+    if (out != nil) then 
         is_started = false
-        if (ball.x > 64) then
-            player_l.score += 1
-        else
-            player_r.score += 1
+        multipliers.x = 0
+        multipliers.y = 0
+        for _, player in pairs(players) do
+            if (player.along_side != out) then
+                player.score += 1
+            end
         end
     end
 
@@ -251,43 +259,51 @@ function detect_collisions(ball)
     ball.velocity_y *= multipliers.y
 end
 
-function detect_collision_with_pad(ball, player, multipliers)
-    local touch_x = false
-    if (player.is_left and player.x + 1 >= ball.x - ball.radius) then 
-        touch_x = true
-    elseif (not player.is_left and player.x - 1 <= ball.x + ball.radius) then 
-        touch_x = true
+function detect_collision_with_pad(ball, pad, multipliers)
+    local touch_static_coord = false
+    if (pad.along_side == 0 and pad[pad.static_coord] + 1 >= ball[pad.static_coord] - ball.radius) then
+        touch_static_coord = true
+    elseif (pad.along_side == 127 and pad[pad.static_coord] - 1 <= ball[pad.static_coord] + ball.radius) then 
+        touch_static_coord = true
     end
 
-    if (not touch_x) then
+    if (not touch_static_coord) then
         return
     end
 
-    log("touched: ")
+    local pad_start = pad[pad.dynamic_coord]
+    local pad_end = pad[pad.dynamic_coord] + pad.length
 
-    local pad_top = player.y
-    local pad_bottom = player.y + player.height
-
-    if (pad_top <= ball.y and ball.y <= pad_bottom) then
+    if (pad_start <= ball[pad.dynamic_coord] and ball[pad.dynamic_coord] <= pad_end) then
         -- heads-on collision
-        multipliers.x = -1
-    elseif (ball.y < pad_top and ball.y + ball.radius >= pad_top) then
+        multipliers[pad.static_coord] = -1
+    elseif (ball[pad.dynamic_coord] < pad_start and ball[pad.dynamic_coord] + ball.radius >= pad_start) then
         -- sideways collision
-        multipliers.x = -1
-        multipliers.y = 2
+        multipliers[pad.static_coord] = -1
+        multipliers[pad.dynamic_coord] = 2
         ball.color = 4
-    elseif (ball.y > pad_bottom and ball.y - ball.radius <= pad_bottom) then
-        multipliers.x = -1
-        multipliers.y = 0.5
+    elseif (ball[pad.dynamic_coord] > pad_end and ball[pad.dynamic_coord] - ball.radius <= pad_end) then
+        multipliers[pad.static_coord] = -1
+        multipliers[pad.dynamic_coord] = 0.5
         ball.color = 4
     end
 end
 
-function detect_out_of_field(ball, multipliers)
-    if (ball.x + ball.radius >= 127 or ball.x - ball.radius <= 0) then
-        multipliers.x = 0
-        multipliers.y = 0
+function detect_out_of_field(ball, mode)
+    local check_coords = {coords.x}
+    if (mode == modes.DOUBLE) then 
+        add(check_coords, coords.y)
     end
+
+    for coord in all(check_coords) do
+        if (ball[coord] + ball.radius >= 127) then
+            return 127
+        elseif (ball[coord] - ball.radius <= 0) then
+            return 0
+        end
+    end
+    
+    return nil
 end
 
 function detect_collision_with_walls(ball, multipliers)
